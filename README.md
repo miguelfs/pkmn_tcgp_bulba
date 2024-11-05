@@ -5,6 +5,11 @@ Python scrapper for getting Pokémon Trading Card Game Pocket (TCGP) mobile game
 Content is scrapped from:
 <https://bulbapedia.bulbagarden.net/wiki/Genetic_Apex_(TCG_Pocket)>
 
+# Usage
+
+1. Install .venv with `pip install -r requirements.txt`, or make sure you have bs4 and requests installed.
+2. Run `python main.py` to get the data from the website.
+
 ## Copyright Notice
 
 This project may include content that has been derived from [Bulbapedia](https://bulbapedia.bulbagarden.net/), a community-driven Pokémon encyclopedia. The original content from Bulbapedia is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 2.5 License](https://creativecommons.org/licenses/by-nc-sa/2.5/). This license grants permission to:
