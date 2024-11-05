@@ -3,6 +3,7 @@ import os
 import csv
 from bs4 import BeautifulSoup
 from datetime import datetime
+from multiprocessing import Pool, cpu_count
 
 # Constant for the main link prefix
 MAIN_LINK = "https://bulbapedia.bulbagarden.net"
@@ -134,13 +135,50 @@ def extract_each_pkmn_metadata(url):
     print(metadata)
     return metadata
 
-def write_metadata(metadata, pkmn):
+# def write_metadata(metadata, pkmn):
+#     """
+#     Writes the metadata of a Pokémon to a CSV file.
+#
+#     Args:
+#     metadata (dict): The metadata dictionary for a Pokémon card.
+#     pkmn (str): The Pokémon number.
+#     """
+#     csv_filepath = 'data/metadata_list.csv'
+#     os.makedirs(os.path.dirname(csv_filepath), exist_ok=True)
+#
+#     # Check if the CSV file exists to determine if we need to write the header
+#     write_header = not os.path.isfile(csv_filepath)
+#
+#     with open(csv_filepath, mode='a', newline='', encoding='utf-8') as file:
+#         writer = csv.writer(file)
+#
+#         # Write header if the file is being created for the first time
+#         if write_header:
+#             writer.writerow(['Number', 'Name', 'HP', 'Type', 'Image Link', 'Weakness', 'Attacks'])
+#
+#         # Convert attack details into a string format for CSV storage
+#         attack_details = "; ".join(
+#             f"{attack['Name']} (Damage: {attack['Damage']}, Description: {attack['Description']}, Energy: {', '.join(attack['Energy Required'])})"
+#             for attack in metadata.get('Attacks', [])
+#         )
+#
+#         # Write the metadata row
+#         writer.writerow([
+#             pkmn,
+#             metadata.get('Name', 'N/A'),
+#             metadata.get('HP', 'N/A'),
+#             metadata.get('Type', 'N/A'),
+#             MAIN_LINK + metadata.get('Image Link', 'N/A') if metadata.get('Image Link', 'N/A') != 'N/A' else 'N/A',
+#             metadata.get('Weakness', 'N/A'),
+#             attack_details
+#         ])
+
+def write_metadata(metadata_list):
     """
-    Writes the metadata of a Pokémon to a CSV file.
+    Writes multiple metadata dictionaries to a CSV file.
     
     Args:
-    metadata (dict): The metadata dictionary for a Pokémon card.
-    pkmn (str): The Pokémon number.
+    metadata_list (list): A list of tuples containing the Pokémon number and its metadata.
     """
     csv_filepath = 'data/metadata_list.csv'
     os.makedirs(os.path.dirname(csv_filepath), exist_ok=True)
@@ -148,33 +186,50 @@ def write_metadata(metadata, pkmn):
     # Check if the CSV file exists to determine if we need to write the header
     write_header = not os.path.isfile(csv_filepath)
     
-    with open(csv_filepath, mode='a', newline='', encoding='utf-8') as file:
+    with open(csv_filepath, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         
         # Write header if the file is being created for the first time
         if write_header:
             writer.writerow(['Number', 'Name', 'HP', 'Type', 'Image Link', 'Weakness', 'Attacks'])
         
-        # Convert attack details into a string format for CSV storage
-        attack_details = "; ".join(
-            f"{attack['Name']} (Damage: {attack['Damage']}, Description: {attack['Description']}, Energy: {', '.join(attack['Energy Required'])})"
-            for attack in metadata.get('Attacks', [])
-        )
-        
-        # Write the metadata row
-        writer.writerow([
-            pkmn,
-            metadata.get('Name', 'N/A'),
-            metadata.get('HP', 'N/A'),
-            metadata.get('Type', 'N/A'),
-            MAIN_LINK + metadata.get('Image Link', 'N/A') if metadata.get('Image Link', 'N/A') != 'N/A' else 'N/A',
-            metadata.get('Weakness', 'N/A'),
-            attack_details
-        ])
+        for pkmn, metadata in metadata_list:
+            # Convert attack details into a string format for CSV storage
+            attack_details = "; ".join(
+                f"{attack['Name']} (Damage: {attack['Damage']}, Description: {attack['Description']}, Energy: {', '.join(attack['Energy Required'])})"
+                for attack in metadata.get('Attacks', [])
+            )
+            
+            # Write the metadata row
+            writer.writerow([
+                pkmn,
+                metadata.get('Name', 'N/A'),
+                metadata.get('HP', 'N/A'),
+                metadata.get('Type', 'N/A'),
+                MAIN_LINK + metadata.get('Image Link', 'N/A') if metadata.get('Image Link', 'N/A') != 'N/A' else 'N/A',
+                metadata.get('Weakness', 'N/A'),
+                attack_details
+            ])
+
+def extract_metadata_parallel(pokemon_links):
+    """
+    Extracts metadata for multiple Pokémon in parallel using multiprocessing.
+    
+    Args:
+    pokemon_links (dict): A dictionary mapping Pokémon numbers to their page links.
+    
+    Returns:
+    list: A list of tuples containing the Pokémon number and its metadata.
+    """
+    with Pool(cpu_count()) as pool:
+        results = pool.starmap(extract_each_pkmn_metadata, [(link,) for link in pokemon_links.values()])
+    
+    return [(pkmn, metadata) for pkmn, metadata in zip(pokemon_links.keys(), results) if metadata]
 
 if __name__ == "__main__":
     pkmns = extract_pkmn_links()
-    for pkmn in pkmns:
-        link = pkmns[pkmn]
-        metadata = extract_each_pkmn_metadata(link)
-        write_metadata(metadata, pkmn)
+    if pkmns:
+        metadata_list = extract_metadata_parallel(pkmns)
+        write_metadata(metadata_list)
+        # metadata = extract_each_pkmn_metadata(link)
+        # write_metadata(metadata, pkmn)
