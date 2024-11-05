@@ -63,6 +63,7 @@ def save_to_csv(data, filepath):
 def extract_pkmn_links():
     url = "https://bulbapedia.bulbagarden.net/wiki/Genetic_Apex_(TCG_Pocket)"
     response = requests.get(url)
+    pokemon_links = []
 
     if response.status_code == 200:
         html_content = response.text
@@ -75,6 +76,7 @@ def extract_pkmn_links():
             print(f"{number}: {link}")
     else:
         print(f"Failed to fetch the page. Status code: {response.status_code}")
+    return pokemon_links
 
 
 def extract_each_pkmn_metadata(url):
@@ -132,6 +134,47 @@ def extract_each_pkmn_metadata(url):
     print(metadata)
     return metadata
 
+def write_metadata(metadata, pkmn):
+    """
+    Writes the metadata of a Pokémon to a CSV file.
+    
+    Args:
+    metadata (dict): The metadata dictionary for a Pokémon card.
+    pkmn (str): The Pokémon number.
+    """
+    csv_filepath = 'data/metadata_list.csv'
+    os.makedirs(os.path.dirname(csv_filepath), exist_ok=True)
+    
+    # Check if the CSV file exists to determine if we need to write the header
+    write_header = not os.path.isfile(csv_filepath)
+    
+    with open(csv_filepath, mode='a', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        
+        # Write header if the file is being created for the first time
+        if write_header:
+            writer.writerow(['Number', 'Name', 'HP', 'Type', 'Image Link', 'Weakness', 'Attacks'])
+        
+        # Convert attack details into a string format for CSV storage
+        attack_details = "; ".join(
+            f"{attack['Name']} (Damage: {attack['Damage']}, Description: {attack['Description']}, Energy: {', '.join(attack['Energy Required'])})"
+            for attack in metadata.get('Attacks', [])
+        )
+        
+        # Write the metadata row
+        writer.writerow([
+            pkmn,
+            metadata.get('Name', 'N/A'),
+            metadata.get('HP', 'N/A'),
+            metadata.get('Type', 'N/A'),
+            MAIN_LINK + metadata.get('Image Link', 'N/A') if metadata.get('Image Link', 'N/A') != 'N/A' else 'N/A',
+            metadata.get('Weakness', 'N/A'),
+            attack_details
+        ])
+
 if __name__ == "__main__":
-    # extract_pkmn_links()
-    extract_each_pkmn_metadata('https://bulbapedia.bulbagarden.net/wiki/Vileplume_(Genetic_Apex_13)')
+    pkmns = extract_pkmn_links()
+    for pkmn in pkmns:
+        link = pkmns[pkmn]
+        metadata = extract_each_pkmn_metadata(link)
+        write_metadata(metadata, pkmn)
