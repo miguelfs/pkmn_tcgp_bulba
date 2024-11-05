@@ -7,7 +7,7 @@ from datetime import datetime
 # Constant for the main link prefix
 MAIN_LINK = "https://bulbapedia.bulbagarden.net"
 
-def extract_pokemon_links(html_content):
+def links_list_metadata(html_content):
     """
     Extracts a map of Pokémon numbers and their hyperlinks from a provided HTML content.
     
@@ -60,13 +60,13 @@ def save_to_csv(data, filepath):
             did_fetch = False
             writer.writerow([number, link, added_at, did_fetch])
 
-if __name__ == "__main__":
+def extract_pkmn_links():
     url = "https://bulbapedia.bulbagarden.net/wiki/Genetic_Apex_(TCG_Pocket)"
     response = requests.get(url)
 
     if response.status_code == 200:
         html_content = response.text
-        pokemon_links = extract_pokemon_links(html_content)
+        pokemon_links = links_list_metadata(html_content)
 
         csv_filepath = 'data/main_list.csv'
         save_to_csv(pokemon_links, csv_filepath)
@@ -75,3 +75,63 @@ if __name__ == "__main__":
             print(f"{number}: {link}")
     else:
         print(f"Failed to fetch the page. Status code: {response.status_code}")
+
+
+def extract_each_pkmn_metadata(url):
+    """
+    Extracts metadata for a Pokémon card from a given URL.
+    
+    Args:
+    url (str): The URL of the Pokémon card page.
+    
+    Returns:
+    dict: A dictionary containing the card's metadata.
+    """
+    response = requests.get(url)
+    if response.status_code != 200:
+        print(f"Failed to fetch the page. Status code: {response.status_code}")
+        return None
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    metadata = {}
+
+    # Extracting name
+    name_tag = soup.find('div', class_='infobox-title-en')
+    metadata['Name'] = name_tag.text.strip() if name_tag else 'N/A'
+
+    # Extracting HP
+    hp_row = soup.find('th', string='HP')
+    metadata['HP'] = hp_row.find_next('td').text.strip() if hp_row else 'N/A'
+
+    # Extracting Type
+    type_row = soup.find('th', string='Type')
+    metadata['Type'] = type_row.find_next('td').text.strip() if type_row else 'N/A'
+
+    # Extracting image link
+    image_tag = soup.find('a', class_='image')
+    metadata['Image Link'] = image_tag['href'] if image_tag else 'N/A'
+
+    # Extracting weaknesses
+    weaknesses_section = soup.find('div', string='weakness')
+    if weaknesses_section:
+        weakness_img = weaknesses_section.find_next('img')
+        metadata['Weakness'] = weakness_img['alt'] if weakness_img else 'N/A'
+
+    # Extracting attack details
+    attack_divs = soup.find_all('div', class_='roundy', style='display: flow-root; border: 2px solid #106C2F; background-color: #6AC588; max-width: 500px')
+    metadata['Attacks'] = []
+    for attack_div in attack_divs:
+        attack_info = {
+            'Name': attack_div.find('div', style='flex: 1').text.strip() if attack_div.find('div', style='flex: 1') else 'N/A',
+            'Damage': attack_div.find('div', style='flex: 0 0 50px; font-size: 1.25rem').text.strip() if attack_div.find('div', style='flex: 0 0 50px; font-size: 1.25rem') else 'N/A',
+            'Description': attack_div.find('div', lang='ja').text.strip() if attack_div.find('div', lang='ja') else 'N/A',
+            'Energy Required': [img['alt'] for img in attack_div.find_all('img') if 'alt' in img.attrs]
+        }
+        metadata['Attacks'].append(attack_info)
+
+    print(metadata)
+    return metadata
+
+if __name__ == "__main__":
+    # extract_pkmn_links()
+    extract_each_pkmn_metadata('https://bulbapedia.bulbagarden.net/wiki/Vileplume_(Genetic_Apex_13)')
